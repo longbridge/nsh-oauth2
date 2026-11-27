@@ -132,7 +132,7 @@ nsh_oauth2::close_auth_session();
 - **One sign-in at a time.** Starting a new session ends the earlier one with `null` (`Cancelled` in Rust).
 - **`ephemeral: true`** asks for a private session that shares no cookies with the user's browser, so the user signs in from scratch. iOS always honors it; on Android it depends on the browser; the desktops ignore it.
 - **On the desktops, a session can wait forever.** If the user closes the browser tab, your app is not told. Show a Cancel button that calls `closeAuthSession()`.
-- **Rust apps that listen for links themselves:** on Android and the desktops, a waiting session takes the app's incoming links (`next_url_scheme_open`). Don't await that function yourself while a session waits, or one of you misses a link.
+- **Your app keeps hearing its links.** On Android and the desktops, a waiting session takes only the next link of its callback scheme. Your `UrlScheme.on("open")` listeners and `next_url_scheme_open()` loops get every other link, during the session and after it. If your app may also get links of that same scheme while a session waits, give sign-in a scheme of its own (for example `myapp-auth`) and claim both in `nsh.json`.
 - **GPUI and terminal backends** receive no links of the app's schemes, so a session there opens the browser but the callback never arrives.
 
 ## Moving from NSH core

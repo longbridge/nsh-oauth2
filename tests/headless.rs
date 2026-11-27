@@ -8,10 +8,19 @@ use nsh_engine::EngineConfig;
 use nsh_oauth2::{AuthSessionOutcome, AuthSessionRequest, close_auth_session, open_auth_session};
 use nsh_testing::Headless;
 
-/// Opens a session ending with a `demo:` callback and shows how it ended.
+/// Opens a session ending with a `demo:` callback and shows how it ended;
+/// listens to the app's links all along, as an app handling deep links
+/// does.
 #[component]
 fn SigningIn() -> impl IntoElement {
     let result = signal(String::from("nothing"));
+    let heard = signal(String::from("app heard"));
+    spawn(async move {
+        loop {
+            let url = next_url_scheme_open().await;
+            heard.set(format!("{} {url}", untracked(|| heard.get())));
+        }
+    });
     let sign_in = move |_: &()| {
         spawn(async move {
             let request = AuthSessionRequest::new("https://example.com/authorize", "demo");
@@ -24,6 +33,7 @@ fn SigningIn() -> impl IntoElement {
     };
     view()
         .child(text(move || result.get()))
+        .child(text(move || heard.get()))
         .child(text("Sign in").on_press(sign_in))
         .child(text("Close").on_press(|_: &()| close_auth_session()))
 }
@@ -36,7 +46,7 @@ fn start() -> (Headless, MutexGuard<'static, ()>) {
     let turn = ONE_AT_A_TIME
         .lock()
         .unwrap_or_else(|poisoned| poisoned.into_inner());
-    let root = Root::of::<SigningIn>().url_schemes(["demo"]);
+    let root = Root::of::<SigningIn>().url_schemes(["demo", "other"]);
     let mut app = Headless::start(EngineConfig::new(root)).unwrap();
     app.first_render().unwrap();
     (app, turn)
@@ -53,6 +63,23 @@ fn the_callback_link_ends_the_session() {
     );
     app.open_with_url("demo://done?code=8").unwrap();
     app.wait_for("text:signed in demo://done?code=8").unwrap();
+}
+
+#[test]
+fn the_app_keeps_hearing_its_links_during_and_after_a_session() {
+    let (mut app, _turn) = start();
+    app.press("Sign in").unwrap();
+    app.wait_for("text:nothing").unwrap();
+    // A link of another scheme is the app's while the session waits.
+    app.open_with_url("other://orders/1").unwrap();
+    app.wait_for("text:app heard other://orders/1").unwrap();
+    // The callback is the session's alone.
+    app.open_with_url("demo://done?code=7").unwrap();
+    app.wait_for("text:signed in demo://done?code=7").unwrap();
+    // After the session, the scheme's links are the app's again.
+    app.open_with_url("demo://orders/2").unwrap();
+    app.wait_for("text:app heard other://orders/1 demo://orders/2")
+        .unwrap();
 }
 
 #[test]

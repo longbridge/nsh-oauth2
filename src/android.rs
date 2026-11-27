@@ -19,7 +19,9 @@ use nsh::{
 use nsh_core::prelude::*;
 use tokio::sync::oneshot;
 
-use crate::{AuthSessionError, AuthSessionOutcome, AuthSessionRequest, wait_for_callback};
+use crate::{
+    AuthSessionError, AuthSessionOutcome, AuthSessionRequest, expect_callback, wait_for_callback,
+};
 
 /// Makes an `ACTION_VIEW` intent a Custom Tab (the Custom Tabs protocol; no
 /// session binder).
@@ -37,17 +39,17 @@ pub(crate) async fn run(
     mut cancelled: oneshot::Receiver<()>,
 ) -> Result<AuthSessionOutcome, AuthSessionError> {
     let (url, ephemeral) = (request.url.clone(), request.ephemeral);
+    let mut callback = expect_callback(request);
     let mut tab = nsh::with_env(|env| Ok(start(env, &url, ephemeral))).map_err(|error| {
         AuthSessionError::failed(format!("openAuthSession: no Java environment: {error}"))
     })??;
-    let scheme = request.scheme();
     tokio::select! {
-        outcome = wait_for_callback(&scheme, &mut cancelled) => outcome,
+        outcome = wait_for_callback(&mut callback, &mut cancelled) => outcome,
         _ = &mut tab => {
             // Back in the app: a callback that brought it back may still be
             // on its way.
             tokio::select! {
-                outcome = wait_for_callback(&scheme, &mut cancelled) => outcome,
+                outcome = wait_for_callback(&mut callback, &mut cancelled) => outcome,
                 _ = timer(LATE_CALLBACK) => Ok(AuthSessionOutcome::Cancelled),
             }
         }

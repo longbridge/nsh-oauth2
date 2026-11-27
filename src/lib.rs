@@ -25,10 +25,12 @@
 //!   once with [`UNAVAILABLE`].
 //!
 //! One session runs at a time: a new one ends the earlier as cancelled.
-//! While a session waits on Android and the desktops, this crate listens
-//! for the app's links ([`nsh_core::element::next_url_scheme_open`]) and
-//! takes the callback; a Rust app that awaits that function itself should
-//! not open a session at the same time.
+//! While a session waits on Android and the desktops, it takes the next
+//! link of its callback scheme
+//! ([`nsh_core::element::next_url_scheme_open_for`]): that link goes to the
+//! session alone, and the app's own listeners (`UrlScheme.on("open")`,
+//! [`nsh_core::element::next_url_scheme_open`]) keep hearing its other
+//! links.
 
 mod request;
 
@@ -113,24 +115,25 @@ pub fn close_auth_session() {
     }
 }
 
-/// Waits for the callback link of `scheme` while the page shows in a
-/// browser: links of other schemes are left to the log. Ends as cancelled
-/// when `cancelled` fires.
+/// Starts waiting for the callback, the next link of `request`'s scheme:
+/// before the page opens, so a callback cannot come first. The app hears
+/// none of the scheme's links while it waits, and its other links as
+/// before; dropping the answer ends the wait.
+#[cfg(not(target_os = "ios"))]
+fn expect_callback(request: &AuthSessionRequest) -> nsh_core::element::Answer<String> {
+    next_url_scheme_open_for(request.scheme())
+}
+
+/// Waits for `callback` while the page shows in a browser. Ends as
+/// cancelled when `cancelled` fires.
 #[cfg(not(target_os = "ios"))]
 async fn wait_for_callback(
-    scheme: &str,
+    callback: &mut nsh_core::element::Answer<String>,
     cancelled: &mut oneshot::Receiver<()>,
 ) -> Result<AuthSessionOutcome, AuthSessionError> {
-    loop {
-        tokio::select! {
-            url = next_url_scheme_open() => {
-                if request::is_callback(&url, scheme) {
-                    return Ok(AuthSessionOutcome::Completed(url));
-                }
-                log::warn!("nsh-oauth2: a link of another scheme came while a sign-in session waited");
-            }
-            _ = &mut *cancelled => return Ok(AuthSessionOutcome::Cancelled),
-        }
+    tokio::select! {
+        url = callback => Ok(AuthSessionOutcome::Completed(url)),
+        _ = cancelled => Ok(AuthSessionOutcome::Cancelled),
     }
 }
 
@@ -144,12 +147,13 @@ mod platform {
         request: &AuthSessionRequest,
         mut cancelled: oneshot::Receiver<()>,
     ) -> Result<AuthSessionOutcome, AuthSessionError> {
+        let mut callback = expect_callback(request);
         if !open_url(request.url.clone()).await {
             return Err(AuthSessionError::failed(
                 "openAuthSession: the browser did not open the sign-in page",
             ));
         }
-        wait_for_callback(&request.scheme(), &mut cancelled).await
+        wait_for_callback(&mut callback, &mut cancelled).await
     }
 }
 

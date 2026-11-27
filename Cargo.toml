@@ -11,13 +11,13 @@ keywords = ["nshm", "nsh", "oauth2", "oauth"]
 categories = ["authentication", "gui"]
 
 [dependencies]
-nsh-core = "0.7.2"
+nsh-core = "0.7.3"
 log = "0.4"
 tokio = { version = "1", default-features = false, features = ["sync", "macros"] }
 url = "2"
 
 [target.'cfg(target_os = "ios")'.dependencies]
-nsh-platform-ios = "0.7.2"
+nsh-platform-ios = "0.7.3"
 block2 = "0.6.2"
 objc2 = "0.6.5"
 objc2-foundation = { version = "0.3.2", default-features = false, features = ["std", "NSError", "NSObject", "NSString", "NSURL"] }
@@ -25,9 +25,9 @@ objc2-ui-kit = { version = "0.3.2", default-features = false, features = ["std",
 objc2-authentication-services = { version = "0.3.2", default-features = false, features = ["std", "block2", "ASWebAuthenticationSession"] }
 
 [target.'cfg(target_os = "android")'.dependencies]
-nsh-platform-android = "0.7.2"
+nsh-platform-android = "0.7.3"
 
 [dev-dependencies]
 # Runs a Rust app headless: the desktop flow (browser, callback link).
-nsh-engine = { version = "0.7.2", default-features = false }
-nsh-testing = { version = "0.7.2", default-features = false }
+nsh-engine = { version = "0.7.3", default-features = false }
+nsh-testing = { version = "0.7.3", default-features = false }
