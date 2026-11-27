@@ -165,7 +165,8 @@ impl fmt::Display for AuthSessionError {
 impl std::error::Error for AuthSessionError {}
 
 /// Whether `url` is a callback of a session waiting for `scheme` (lower
-/// case).
+/// case). iOS hands the callback back itself.
+#[cfg_attr(target_os = "ios", allow(dead_code))]
 pub(crate) fn is_callback(url: &str, scheme: &str) -> bool {
     url::Url::parse(url).is_ok_and(|parsed| parsed.scheme() == scheme)
 }
