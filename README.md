@@ -16,7 +16,7 @@ One session runs at a time. Opening a new one ends the earlier one as cancelled.
 ## Install
 
 ```sh
-nsh add github:longbridge/nsh-oauth2
+nsh add nsh-oauth2
 ```
 
 On Android and the desktops, claim the callback scheme in `nsh.json`:
@@ -79,7 +79,7 @@ nsh_oauth2::close_auth_session();
 
 NSH up to 0.7 had this feature built in as `nsh_core::element::open_auth_session` and `close_auth_session`. It is deprecated there and will be removed. To move:
 
-1. `nsh add github:longbridge/nsh-oauth2`.
+1. `nsh add nsh-oauth2`.
 2. Replace `nsh_core::auth_session::AuthSessionRequest` and friends with `nsh_oauth2::AuthSessionRequest`, and `open_auth_session` / `close_auth_session` with the functions of the same name in `nsh_oauth2`.
 
 The request, outcome and error types have the same fields as before.
