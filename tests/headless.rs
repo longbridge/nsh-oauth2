@@ -1,6 +1,8 @@
 //! The browser flow of the desktops and Android, run headless: the page
 //! opens in the browser, and a link of the callback scheme ends the session.
 
+use std::sync::{Mutex, MutexGuard};
+
 use nsh_core::{element::Root, prelude::*};
 use nsh_engine::EngineConfig;
 use nsh_oauth2::{AuthSessionOutcome, AuthSessionRequest, close_auth_session, open_auth_session};
@@ -26,16 +28,23 @@ fn SigningIn() -> impl IntoElement {
         .child(text("Close").on_press(|_: &()| close_auth_session()))
 }
 
-fn start() -> Headless {
+/// The waiting session is process-wide, so the tests take turns: a test
+/// signing in while another one waits would cancel the other's session.
+static ONE_AT_A_TIME: Mutex<()> = Mutex::new(());
+
+fn start() -> (Headless, MutexGuard<'static, ()>) {
+    let turn = ONE_AT_A_TIME
+        .lock()
+        .unwrap_or_else(|poisoned| poisoned.into_inner());
     let root = Root::of::<SigningIn>().url_schemes(["demo"]);
     let mut app = Headless::start(EngineConfig::new(root)).unwrap();
     app.first_render().unwrap();
-    app
+    (app, turn)
 }
 
 #[test]
 fn the_callback_link_ends_the_session() {
-    let mut app = start();
+    let (mut app, _turn) = start();
     app.press("Sign in").unwrap();
     app.wait_for("text:nothing").unwrap();
     assert_eq!(
@@ -48,7 +57,7 @@ fn the_callback_link_ends_the_session() {
 
 #[test]
 fn a_new_session_or_closing_cancels_the_waiting_one() {
-    let mut app = start();
+    let (mut app, _turn) = start();
     app.press("Sign in").unwrap();
     app.press("Sign in").unwrap();
     app.wait_for("text:cancelled").unwrap();
@@ -63,7 +72,7 @@ fn a_new_session_or_closing_cancels_the_waiting_one() {
 
 #[test]
 fn a_browser_that_does_not_open_fails_the_session() {
-    let mut app = start();
+    let (mut app, _turn) = start();
     app.fail_open_urls("https://example.com/authorize").unwrap();
     app.press("Sign in").unwrap();
     app.wait_for("text:openAuthSession: the browser did not open the sign-in page")
