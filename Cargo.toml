@@ -26,3 +26,8 @@ objc2-authentication-services = { version = "0.3.2", default-features = false, f
 
 [target.'cfg(target_os = "android")'.dependencies]
 nsh-platform-android = "0.7.2"
+
+[dev-dependencies]
+# Runs a Rust app headless: the desktop flow (browser, callback link).
+nsh-engine = { version = "0.7.2", default-features = false }
+nsh-testing = { version = "0.7.2", default-features = false }
